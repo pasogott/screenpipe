@@ -150,6 +150,8 @@ export type WorkflowRecording = {
 };
 
 export type WorkflowsAppProps = {
+  /** Optional content-free usage events; the host owns consent and identity. */
+  onUsageEvent?: (event: import("./use-workflow-usage").WorkflowUsageEvent) => void;
   modelControl?: import("react").ReactNode;
   /** Quiet in-app alternative to interrupting a focused workflow reader. */
   readyWorkflowIds?: string[];
