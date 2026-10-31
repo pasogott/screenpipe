@@ -2,6 +2,7 @@
 // https://screenpipe.com
 
 import React from "react";
+import posthog from "posthog-js";
 import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RecordingStatus } from "@/components/recording-status";
@@ -182,4 +183,13 @@ it("recovers a removed workflow into the catalog without claiming it opened", as
   expect(await screen.findByText("This workflow is no longer available. Your other workflows are shown below.")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Workflows", level: 1 })).toBeVisible();
   expect(posthog.capture).toHaveBeenCalledWith("workflow_notification_open_failed", expect.objectContaining({ reason: "workflow_unavailable" }));
+});
+
+ it("wires visible device Workflows visits to explicit telemetry", async () => {
+  vi.mocked(posthog.capture).mockClear();
+  const app = render(<IntegratedWorkflows active={false} onModeChange={vi.fn()} recordingStatus={null} />);
+  expect(posthog.capture).not.toHaveBeenCalledWith("workflow_opened", expect.anything());
+  app.rerender(<IntegratedWorkflows active onModeChange={vi.fn()} recordingStatus={null} />);
+  await screen.findByRole("heading", { name: "Research synthesis" });
+  expect(posthog.capture).toHaveBeenCalledWith("workflow_opened", expect.objectContaining({ surface: "desktop_workflows", workflow_source: "device" }));
 });

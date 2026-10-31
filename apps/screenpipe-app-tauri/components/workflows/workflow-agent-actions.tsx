@@ -12,6 +12,7 @@ import { buildHomeCardAgentPrompt } from "@/components/chat/home-card-agent-acti
 import { handoffTargets, performAgentHandoff } from "@/lib/first-run/agent-handoff";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { commands } from "@/lib/utils/tauri";
+import { captureWorkflowUsage } from "@/lib/workflows/usage";
 import { toast } from "@/components/ui/use-toast";
 import styles from "./workflow-agent-actions.module.css";
 
@@ -39,9 +40,11 @@ export function WorkflowAgentActions({ workflow }: { workflow: WorkflowMap }) {
     launching.current = true;
     setPending(true);
     const task = workflowAgentTask(workflow);
+    captureWorkflowUsage({ event: "workflow_agent_handoff_requested", runner });
     try {
       if (runner === "screenpipe") {
         await showChatWithPrefill({ context: "Read the Screenpipe skill and help carry out the saved workflow using its current steps and sources.", prompt: task.previewPrompt, autoSend: false, useHomeChat: true });
+        captureWorkflowUsage({ event: "workflow_agent_handoff_result", runner, outcome: "prefilled" });
       } else {
         const target = handoffTargets().find(item => item.id === runner)!;
         const result = await performAgentHandoff(target, {
@@ -51,11 +54,13 @@ export function WorkflowAgentActions({ workflow }: { workflow: WorkflowMap }) {
           },
           openUrl: openExternalUrl,
         }, buildHomeCardAgentPrompt(task, runner));
+        captureWorkflowUsage({ event: "workflow_agent_handoff_result", runner, outcome: result.prefilled ? "prefilled" : result.copied ? "copied" : "failed" });
         if (!result.prefilled) {
           toast({ title: result.copied ? "Prompt copied" : "Could not open agent", description: result.copied ? `Paste it into ${runners.find(item => item.id === runner)!.label} to continue.` : "Try again.", variant: result.copied ? "default" : "destructive" });
         }
       }
     } catch {
+      captureWorkflowUsage({ event: "workflow_agent_handoff_result", runner, outcome: "failed" });
       toast({ title: "Could not open agent", description: "Your workflow is saved. Try again.", variant: "destructive" });
     } finally { launching.current = false; setPending(false); }
   }
